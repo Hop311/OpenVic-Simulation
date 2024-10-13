@@ -16,6 +16,7 @@ using enum CountryInstance::country_status_t;
 static constexpr colour_t ERROR_COLOUR = colour_t::from_integer(0xFF0000);
 
 CountryInstance::CountryInstance(
+	bool new_ADD_OWNER_CONTRIBUTION,
 	CountryDefinition const* new_country_definition,
 	decltype(building_type_unlock_levels)::keys_t const& building_type_keys,
 	decltype(technology_unlock_levels)::keys_t const& technology_keys,
@@ -28,6 +29,7 @@ CountryInstance::CountryInstance(
 	decltype(regiment_type_unlock_levels)::keys_t const& regiment_type_unlock_levels_keys,
 	decltype(ship_type_unlock_levels)::keys_t const& ship_type_unlock_levels_keys
 ) : /* Main attributes */
+	ADD_OWNER_CONTRIBUTION { new_ADD_OWNER_CONTRIBUTION },
 	country_definition { new_country_definition },
 	colour { ERROR_COLOUR },
 	capital { nullptr },
@@ -1007,7 +1009,7 @@ void CountryInstance::update_modifier_sum(Date today, StaticModifierCache const&
 		}
 	}
 
-	if constexpr (ProvinceInstance::ADD_OWNER_CONTRIBUTION) {
+	if (ADD_OWNER_CONTRIBUTION) {
 		// Add province base modifiers (with local province modifier effects removed)
 		for (ProvinceInstance const* province : owned_provinces) {
 			contribute_province_modifier_sum(province->get_modifier_sum());
@@ -1026,9 +1028,7 @@ void CountryInstance::update_modifier_sum(Date today, StaticModifierCache const&
 void CountryInstance::contribute_province_modifier_sum(ModifierSum const& province_modifier_sum) {
 	using enum ModifierEffect::target_t;
 
-	static constexpr ModifierEffect::target_t NOT_PROVINCE = ALL_TARGETS & ~PROVINCE;
-
-	modifier_sum.add_modifier_sum_filter_targets(province_modifier_sum, NOT_PROVINCE);
+	modifier_sum.add_modifier_sum_exclude_targets(province_modifier_sum, PROVINCE);
 }
 
 fixed_point_t CountryInstance::get_modifier_effect_value(ModifierEffect const& effect) const {
@@ -1219,6 +1219,7 @@ CountryInstance const& CountryInstanceManager::get_country_instance_from_definit
 }
 
 bool CountryInstanceManager::generate_country_instances(
+	bool ADD_OWNER_CONTRIBUTION,
 	CountryDefinitionManager const& country_definition_manager,
 	decltype(CountryInstance::building_type_unlock_levels)::keys_t const& building_type_keys,
 	decltype(CountryInstance::technology_unlock_levels)::keys_t const& technology_keys,
@@ -1237,6 +1238,7 @@ bool CountryInstanceManager::generate_country_instances(
 
 	for (CountryDefinition const& country_definition : country_definition_manager.get_country_definitions()) {
 		ret &= country_instances.add_item({
+			ADD_OWNER_CONTRIBUTION,
 			&country_definition,
 			building_type_keys,
 			technology_keys,

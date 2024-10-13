@@ -31,7 +31,7 @@ namespace OpenVic {
 	private:
 		/* Tech/inventions only */
 		ModifierEffect const* PROPERTY(cb_creation_speed);
-		ModifierEffect const* PROPERTY(combat_width);
+		ModifierEffect const* PROPERTY(combat_width_additive);
 		ModifierEffect const* PROPERTY(plurality);
 		ModifierEffect const* PROPERTY(pop_growth);
 		ModifierEffect const* PROPERTY(regular_experience_level);
@@ -140,6 +140,7 @@ namespace OpenVic {
 		/* Province Modifier Effects */
 		ModifierEffect const* PROPERTY(assimilation_rate);
 		ModifierEffect const* PROPERTY(boost_strongest_party);
+		ModifierEffect const* PROPERTY(combat_width_multiplicative);
 		ModifierEffect const* PROPERTY(farm_rgo_eff);
 		ModifierEffect const* PROPERTY(farm_rgo_size);
 		ModifierEffect const* PROPERTY(immigrant_attract);

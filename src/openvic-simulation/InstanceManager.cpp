@@ -7,7 +7,7 @@ using namespace OpenVic;
 
 InstanceManager::InstanceManager(
 	DefinitionManager const& new_definition_manager, gamestate_updated_func_t gamestate_updated_callback,
-	SimulationClock::state_changed_function_t clock_state_changed_callback
+	SimulationClock::state_changed_function_t clock_state_changed_callback, bool new_ADD_OWNER_CONTRIBUTION
 ) : definition_manager { new_definition_manager },
 	map_instance { new_definition_manager.get_map_definition() },
 	simulation_clock {
@@ -21,7 +21,8 @@ InstanceManager::InstanceManager(
 	today {},
 	gamestate_updated { gamestate_updated_callback ? std::move(gamestate_updated_callback) : []() {} },
 	gamestate_needs_update { false },
-	currently_updating_gamestate { false } {}
+	currently_updating_gamestate { false },
+	ADD_OWNER_CONTRIBUTION { new_ADD_OWNER_CONTRIBUTION } {}
 
 void InstanceManager::set_gamestate_needs_update() {
 	if (!currently_updating_gamestate) {
@@ -39,7 +40,7 @@ void InstanceManager::update_gamestate() {
 
 	Logger::info("Update: ", today);
 
-	if constexpr (ProvinceInstance::ADD_OWNER_CONTRIBUTION) {
+	if (ADD_OWNER_CONTRIBUTION) {
 		// Calculate local province modifier sums first, then national country modifier sums, then loop over owned provinces
 		// adding their contributions to the owner country's modifier sum and loop over them again to add the country's total
 		// (including province contributions) to the provinces' modifier sum. This results in every country and province
@@ -99,11 +100,13 @@ bool InstanceManager::setup() {
 
 	bool ret = good_instance_manager.setup(definition_manager.get_economy_manager().get_good_definition_manager());
 	ret &= map_instance.setup(
+		ADD_OWNER_CONTRIBUTION,
 		definition_manager.get_economy_manager().get_building_type_manager(),
 		definition_manager.get_pop_manager().get_pop_types(),
 		definition_manager.get_politics_manager().get_ideology_manager().get_ideologies()
 	);
 	ret &= country_instance_manager.generate_country_instances(
+		ADD_OWNER_CONTRIBUTION,
 		definition_manager.get_country_definition_manager(),
 		definition_manager.get_economy_manager().get_building_type_manager().get_building_types(),
 		definition_manager.get_research_manager().get_technology_manager().get_technologies(),

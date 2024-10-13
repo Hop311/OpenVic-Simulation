@@ -70,9 +70,11 @@ namespace OpenVic {
 		ordered_set<CountryInstance*> PROPERTY(cores);
 
 	public:
-		static constexpr bool ADD_OWNER_CONTRIBUTION = true;
+		// static constexpr bool ADD_OWNER_CONTRIBUTION = true;
 
 	private:
+		const bool ADD_OWNER_CONTRIBUTION;
+
 		// The total/resultant modifier affecting this province, including owner country contributions if
 		// ADD_OWNER_CONTRIBUTION is true.
 		ModifierSum PROPERTY(modifier_sum);
@@ -101,6 +103,7 @@ namespace OpenVic {
 		size_t PROPERTY(max_supported_regiments);
 
 		ProvinceInstance(
+			bool new_ADD_OWNER_CONTRIBUTION,
 			ProvinceDefinition const& new_province_definition, decltype(pop_type_distribution)::keys_t const& pop_type_keys,
 			decltype(ideology_distribution)::keys_t const& ideology_keys
 		);

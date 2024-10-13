@@ -58,7 +58,7 @@ ModifierEffectCache::strata_effects_t::strata_effects_t()
 ModifierEffectCache::ModifierEffectCache()
   : /* Tech/inventions only */
 	cb_creation_speed { nullptr },
-	combat_width { nullptr },
+	combat_width_additive { nullptr },
 	plurality { nullptr },
 	pop_growth { nullptr },
 	regular_experience_level { nullptr },
@@ -167,6 +167,7 @@ ModifierEffectCache::ModifierEffectCache()
 	/* Province Modifier Effects */
 	assimilation_rate { nullptr },
 	boost_strongest_party { nullptr },
+	combat_width_multiplicative { nullptr },
 	farm_rgo_eff { nullptr },
 	farm_rgo_size { nullptr },
 	immigrant_attract { nullptr },

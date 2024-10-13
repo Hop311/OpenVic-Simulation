@@ -33,6 +33,7 @@ bool CrimeManager::load_crime_modifiers(ModifierManager const& modifier_manager,
 			bool default_active = false;
 			bool ret = modifier_manager.expect_modifier_value_and_keys(
 				move_variable_callback(modifier_value),
+				CRIME,
 				"icon", ZERO_OR_ONE, expect_uint(assign_variable_callback(icon)),
 				"trigger", ONE_EXACTLY, trigger.expect_script(),
 				"active", ZERO_OR_ONE, expect_bool(assign_variable_callback(default_active))

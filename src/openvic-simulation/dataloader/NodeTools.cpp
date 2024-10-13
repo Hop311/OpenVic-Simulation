@@ -442,6 +442,22 @@ node_callback_t NodeTools::expect_dictionary(key_value_callback_t callback) {
 	return expect_dictionary_and_length(default_length_callback, callback);
 }
 
+node_callback_t NodeTools::expect_dictionary_and_replace(
+	key_value_callback_t callback, string_map_t<std::string> const& replace_map
+) {
+	return [callback, &replace_map](ast::NodeCPtr node) -> bool {
+		return expect_dictionary(
+			[&callback, &replace_map](std::string_view key, ast::NodeCPtr value) -> bool {
+				auto it = replace_map.find(key);
+				if (it != replace_map.end()) {
+					key = it->second;
+				}
+				return callback(key, value);
+			}
+		)(node);
+	};
+}
+
 node_callback_t NodeTools::name_list_callback(callback_t<name_list_t&&> callback) {
 	return [callback](ast::NodeCPtr node) -> bool {
 		name_list_t list;

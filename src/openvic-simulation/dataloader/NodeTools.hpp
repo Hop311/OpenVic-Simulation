@@ -183,6 +183,10 @@ namespace OpenVic {
 		node_callback_t expect_dictionary_and_length(length_callback_t length_callback, key_value_callback_t callback);
 		node_callback_t expect_dictionary(key_value_callback_t callback);
 
+		node_callback_t expect_dictionary_and_replace(
+			key_value_callback_t callback, string_map_t<std::string> const& replace_map
+		);
+
 		struct dictionary_entry_t {
 			enum class expected_count_t : uint8_t {
 				_MUST_APPEAR = 0b01,

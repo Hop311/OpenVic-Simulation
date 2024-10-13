@@ -62,6 +62,8 @@ namespace OpenVic {
 		using unit_variant_t = uint8_t;
 
 	private:
+		const bool ADD_OWNER_CONTRIBUTION;
+
 		/* Main attributes */
 		// We can always assume country_definition is not null, as it is initialised from a reference and only ever changed
 		// by swapping with another CountryInstance's country_definition.
@@ -185,6 +187,7 @@ namespace OpenVic {
 		UNIT_BRANCHED_GETTER(get_unit_type_unlock_levels, regiment_type_unlock_levels, ship_type_unlock_levels);
 
 		CountryInstance(
+			bool new_ADD_OWNER_CONTRIBUTION,
 			CountryDefinition const* new_country_definition,
 			decltype(building_type_unlock_levels)::keys_t const& building_type_keys,
 			decltype(technology_unlock_levels)::keys_t const& technology_keys,
@@ -343,6 +346,7 @@ namespace OpenVic {
 		CountryInstance const& get_country_instance_from_definition(CountryDefinition const& country) const;
 
 		bool generate_country_instances(
+			bool ADD_OWNER_CONTRIBUTION,
 			CountryDefinitionManager const& country_definition_manager,
 			decltype(CountryInstance::building_type_unlock_levels)::keys_t const& building_type_keys,
 			decltype(CountryInstance::technology_unlock_levels)::keys_t const& technology_keys,

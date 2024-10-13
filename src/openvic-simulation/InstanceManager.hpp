@@ -33,6 +33,8 @@ namespace OpenVic {
 		bool PROPERTY_CUSTOM_PREFIX(game_instance_setup, is);
 		bool PROPERTY_CUSTOM_PREFIX(game_session_started, is);
 
+		const bool ADD_OWNER_CONTRIBUTION;
+
 	public:
 		inline constexpr bool is_bookmark_loaded() const {
 			return bookmark != nullptr;
@@ -52,7 +54,7 @@ namespace OpenVic {
 	public:
 		InstanceManager(
 			DefinitionManager const& new_definition_manager, gamestate_updated_func_t gamestate_updated_callback,
-			SimulationClock::state_changed_function_t clock_state_changed_callback
+			SimulationClock::state_changed_function_t clock_state_changed_callback, bool new_ADD_OWNER_CONTRIBUTION
 		);
 
 		bool setup();

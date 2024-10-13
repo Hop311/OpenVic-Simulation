@@ -66,7 +66,11 @@ bool ModifierManager::setup_modifier_effects() {
 	ret &= add_modifier_effect(
 		modifier_effect_cache.cb_creation_speed, "cb_creation_speed", true, PROPORTION_DECIMAL, COUNTRY, "CB_MANUFACTURE_TECH"
 	);
-	ret &= add_modifier_effect(modifier_effect_cache.combat_width, "combat_width", false, PROPORTION_DECIMAL, COUNTRY);
+	// When applied to countries (army tech/inventions), combat_width is an additive integer value.
+	ret &= add_modifier_effect(
+		modifier_effect_cache.combat_width_additive, "combat_width additive", false, INT, PROVINCE,
+		ModifierEffect::make_default_modifier_effect_localisation_key("combat_width")
+	);
 	ret &= add_modifier_effect(
 		modifier_effect_cache.plurality, "plurality", true, PERCENTAGE_DECIMAL, COUNTRY, "TECH_PLURALITY"
 	);
@@ -365,6 +369,11 @@ bool ModifierManager::setup_modifier_effects() {
 	ret &= add_modifier_effect(
 		modifier_effect_cache.boost_strongest_party, "boost_strongest_party", false, PROPORTION_DECIMAL, PROVINCE
 	);
+	// When applied to provinces (terrain), combat_width is a multiplicative proportional decimal value.
+	ret &= add_modifier_effect(
+		modifier_effect_cache.combat_width_multiplicative, "combat_width multiplicative", false, PROPORTION_DECIMAL, COUNTRY,
+		ModifierEffect::make_default_modifier_effect_localisation_key("combat_width")
+	);
 	ret &= add_modifier_effect(
 		modifier_effect_cache.farm_rgo_eff, "farm_rgo_eff", true, PROPORTION_DECIMAL, PROVINCE, "TECH_FARM_OUTPUT"
 	);
@@ -447,7 +456,7 @@ bool ModifierManager::setup_modifier_effects() {
 	/* Military Modifier Effects */
 	ret &= add_modifier_effect(modifier_effect_cache.attack, "attack", true, INT, UNIT, "TRAIT_ATTACK");
 	ret &= add_modifier_effect(modifier_effect_cache.attrition, "attrition", false, RAW_DECIMAL, UNIT, "ATTRITION");
-	ret &= add_modifier_effect(modifier_effect_cache.defence, "defence", true, INT, UNIT, "TRAIT_DEFEND");
+	ret &= add_modifier_effect(modifier_effect_cache.defence, "defence", true, INT, PROVINCE | UNIT, "TRAIT_DEFEND");
 	ret &= add_modifier_effect(
 		modifier_effect_cache.experience, "experience", true, PROPORTION_DECIMAL, UNIT, "TRAIT_EXPERIENCE"
 	);
@@ -554,6 +563,8 @@ bool ModifierManager::add_triggered_modifier(
 }
 
 bool ModifierManager::load_triggered_modifiers(ast::NodeCPtr root) {
+	using enum Modifier::modifier_type_t;
+
 	const bool ret = expect_dictionary_reserve_length(
 		triggered_modifiers,
 		[this](std::string_view key, ast::NodeCPtr value) -> bool {
@@ -563,6 +574,7 @@ bool ModifierManager::load_triggered_modifiers(ast::NodeCPtr root) {
 
 			bool ret = expect_modifier_value_and_keys(
 				move_variable_callback(modifier_value),
+				TRIGGERED,
 				"icon", ZERO_OR_ONE, expect_uint(assign_variable_callback(icon)),
 				"trigger", ONE_EXACTLY, trigger.expect_script()
 			)(value);
@@ -587,7 +599,8 @@ bool ModifierManager::parse_scripts(DefinitionManager const& definition_manager)
 }
 
 key_value_callback_t ModifierManager::_modifier_effect_callback(
-	ModifierValue& modifier, key_value_callback_t default_callback, ModifierEffectValidator auto effect_validator
+	ModifierValue& modifier, Modifier::modifier_type_t type, key_value_callback_t default_callback,
+	ModifierEffectValidator auto effect_validator
 ) const {
 	const auto add_modifier_cb = [this, &modifier, effect_validator](
 		ModifierEffect const* effect, ast::NodeCPtr value
@@ -624,6 +637,34 @@ key_value_callback_t ModifierManager::_modifier_effect_callback(
 	return [this, default_callback, add_modifier_cb, add_flattened_modifier_cb](
 		std::string_view key, ast::NodeCPtr value
 	) -> bool {
+
+		if (dryad::node_has_kind<ast::IdentifierValue>(value)) {
+			ModifierEffect const* effect = get_modifier_effect_by_identifier(key);
+			if (effect != nullptr) {
+				return add_modifier_cb(effect, value);
+			} else if (key == "war_exhaustion_effect") {
+				Logger::warning("war_exhaustion_effect does nothing (vanilla issues have it).");
+				return true;
+			} else {
+				// try special variants e.g. for combat_width
+			}
+		} else if (complex_modifiers.contains(key) && dryad::node_has_kind<ast::ListValue>(value)) {
+			if (key == "rebel_org_gain") { //because of course there's a special one
+				std::string_view faction_identifier;
+				ast::NodeCPtr value_node = nullptr;
+				bool ret = expect_dictionary_keys(
+					"faction", ONE_EXACTLY, expect_identifier(assign_variable_callback(faction_identifier)),
+					"value", ONE_EXACTLY, assign_variable_callback(value_node)
+				)(value);
+				ret &= add_flattened_modifier_cb(key, faction_identifier, value_node);
+				return ret;
+			} else {
+				return expect_dictionary(std::bind_front(add_flattened_modifier_cb, key))(value);
+			}
+		}
+
+		return default_callback(key, value);
+
 		ModifierEffect const* effect = get_modifier_effect_by_identifier(key);
 		if (effect != nullptr && dryad::node_has_kind<ast::IdentifierValue>(value)) {
 			return add_modifier_cb(effect, value);
@@ -650,14 +691,14 @@ key_value_callback_t ModifierManager::_modifier_effect_callback(
 }
 
 node_callback_t ModifierManager::expect_validated_modifier_value_and_default(
-	callback_t<ModifierValue&&> modifier_callback, key_value_callback_t default_callback,
+	callback_t<ModifierValue&&> modifier_callback, Modifier::modifier_type_t type, key_value_callback_t default_callback,
 	ModifierEffectValidator auto effect_validator
 ) const {
-	return [this, modifier_callback, default_callback, effect_validator](ast::NodeCPtr root) -> bool {
+	return [this, modifier_callback, type, default_callback, effect_validator](ast::NodeCPtr root) -> bool {
 		ModifierValue modifier;
 		bool ret = expect_dictionary_reserve_length(
 			modifier.values,
-			_modifier_effect_callback(modifier, default_callback, effect_validator)
+			_modifier_effect_callback(modifier, type, default_callback, effect_validator)
 		)(root);
 		ret &= modifier_callback(std::move(modifier));
 		return ret;
@@ -671,11 +712,13 @@ node_callback_t ModifierManager::expect_validated_modifier_value(
 }
 
 node_callback_t ModifierManager::expect_modifier_value_and_default(
-	callback_t<ModifierValue&&> modifier_callback, key_value_callback_t default_callback
+	callback_t<ModifierValue&&> modifier_callback, Modifier::modifier_type_t type, key_value_callback_t default_callback
 ) const {
-	return expect_validated_modifier_value_and_default(modifier_callback, default_callback, [](ModifierEffect const&) -> bool {
-		return true;
-	});
+	return expect_validated_modifier_value_and_default(
+		modifier_callback, type, default_callback, [](ModifierEffect const&) -> bool {
+			return true;
+		}
+	);
 }
 
 node_callback_t ModifierManager::expect_modifier_value(callback_t<ModifierValue&&> modifier_callback) const {
@@ -683,10 +726,11 @@ node_callback_t ModifierManager::expect_modifier_value(callback_t<ModifierValue&
 }
 
 node_callback_t ModifierManager::expect_whitelisted_modifier_value_and_default(
-	callback_t<ModifierValue&&> modifier_callback, string_set_t const& whitelist, key_value_callback_t default_callback
+	callback_t<ModifierValue&&> modifier_callback, string_set_t const& whitelist, Modifier::modifier_type_t type,
+	key_value_callback_t default_callback
 ) const {
 	return expect_validated_modifier_value_and_default(
-		modifier_callback, default_callback,
+		modifier_callback, type, default_callback,
 		[&whitelist](ModifierEffect const& effect) -> bool {
 			return whitelist.contains(effect.get_identifier());
 		}
@@ -694,17 +738,19 @@ node_callback_t ModifierManager::expect_whitelisted_modifier_value_and_default(
 }
 
 node_callback_t ModifierManager::expect_whitelisted_modifier_value(
-	callback_t<ModifierValue&&> modifier_callback, string_set_t const& whitelist
+	callback_t<ModifierValue&&> modifier_callback, string_set_t const& whitelist, Modifier::modifier_type_t type
 ) const {
-	return expect_whitelisted_modifier_value_and_default(modifier_callback, whitelist, key_value_invalid_callback);
+	return expect_whitelisted_modifier_value_and_default(modifier_callback, whitelist, type, key_value_invalid_callback);
 }
 
 node_callback_t ModifierManager::expect_modifier_value_and_key_map_and_default(
-	callback_t<ModifierValue&&> modifier_callback, key_value_callback_t default_callback, key_map_t&& key_map
+	callback_t<ModifierValue&&> modifier_callback, Modifier::modifier_type_t type, key_value_callback_t default_callback,
+	key_map_t&& key_map
 ) const {
-	return [this, modifier_callback, default_callback, key_map = std::move(key_map)](ast::NodeCPtr node) mutable -> bool {
+	return [this, modifier_callback, type, default_callback, key_map = std::move(key_map)](ast::NodeCPtr node) mutable -> bool {
 		bool ret = expect_modifier_value_and_default(
 			modifier_callback,
+			type,
 			dictionary_keys_callback(key_map, default_callback)
 		)(node);
 		ret &= check_key_map_counts(key_map);
@@ -713,9 +759,9 @@ node_callback_t ModifierManager::expect_modifier_value_and_key_map_and_default(
 }
 
 node_callback_t ModifierManager::expect_modifier_value_and_key_map(
-	callback_t<ModifierValue&&> modifier_callback, key_map_t&& key_map
+	callback_t<ModifierValue&&> modifier_callback, Modifier::modifier_type_t type, key_map_t&& key_map
 ) const {
-	return expect_modifier_value_and_key_map_and_default(modifier_callback, key_value_invalid_callback, std::move(key_map));
+	return expect_modifier_value_and_key_map_and_default(modifier_callback, type, key_value_invalid_callback, std::move(key_map));
 }
 
 namespace OpenVic { // so the compiler shuts up
